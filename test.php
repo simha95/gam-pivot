@@ -69,13 +69,22 @@ $data = Pivot::factory($recordset)
     ->fetch();
 simpleHtmlTable($data);
 
-echo "<h2>pivot on 'host' and 'country' with calculated columms</h2>";
+
+echo "<h2>pivot on 'host' and 'country' with group count</h2>";
 $data = Pivot::factory($recordset)
     ->pivotOn(array('host', 'country'))
-    ->addColumn(array('year', 'month'), array('users', 'clicks', Pivot::callback('average', $averageCbk)))
-    ->lineTotal()
-    ->pivotTotal()
+    ->addColumn(array('year', 'month'), array('users', 'clicks', Pivot::count('count')))
     ->fullTotal()
-    ->typeMark()
+    ->pivotTotal()
+    ->lineTotal()
+    ->fetch();
+simpleHtmlTable($data);
+
+echo "<h2>pivot on 'country' with group count</h2>";
+$data = Pivot::factory($recordset)
+    ->pivotOn(array('host'))
+    ->addColumn(array('country'), array('year', Pivot::count('count')))
+    ->lineTotal()
+    ->fullTotal()
     ->fetch();
 simpleHtmlTable($data);

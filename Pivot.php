@@ -91,7 +91,7 @@ class Pivot
 
     public function fetch($fetchType=null)
     {
-        $tmp = array();
+        $tmp = $tmpCount = array();
         $split  = $this->_column[0];
         $column = $this->_column[1];
 
@@ -102,6 +102,8 @@ class Pivot
                     foreach ($this->_columnValues as $item) {
                         if ($item instanceof Pivot_Callback) {
                             break;
+                        } elseif ($item instanceof Pivot_Count) {
+                            $tmpCount[$k0][$reg[$split]][$reg[$column]][$item->getKey()]++;
                         }
                         $tmp[$k0][$reg[$split]][$reg[$column]][$item] += $reg[$item];
                         $this->_splits[$reg[$split]][$reg[$column]][$item] = $item;
@@ -113,6 +115,8 @@ class Pivot
                     foreach ($this->_columnValues as $item) {
                         if ($item instanceof Pivot_Callback) {
                             break;
+                        } elseif ($item instanceof Pivot_Count) {
+                            $tmpCount[$k0][$k1][$reg[$split]][$reg[$column]][$item->getKey()] ++;
                         }
                         $tmp[$k0][$k1][$reg[$split]][$reg[$column]][$item] += $reg[$item];
                         $this->_splits[$reg[$split]][$reg[$column]][$item] = $item;
@@ -125,6 +129,8 @@ class Pivot
                     foreach ($this->_columnValues as $item) {
                         if ($item instanceof Pivot_Callback) {
                             break;
+                        } elseif ($item instanceof Pivot_Count) {
+                            $tmpCount[$k0][$k1][$k2][$reg[$split]][$reg[$column]][$item->getKey()] ++;
                         }
                         $tmp[$k0][$k1][$k2][$reg[$split]][$reg[$column]][$item] += $reg[$item];
                         $this->_splits[$reg[$split]][$reg[$column]][$item] = $item;
@@ -132,7 +138,7 @@ class Pivot
                     break;
             }
         }
-        return $this->_buildOutput($tmp, $fetchType);
+        return $this->_buildOutput($tmp, $fetchType, $tmpCount);
     }
 
     const TYPE_LINE = 0;
@@ -141,7 +147,7 @@ class Pivot
     const TYPE_FULL_TOTAL = 3;
 
     const _ID = '_id';
-    private function _buildOutput($tmp, $fetchType)
+    private function _buildOutput($tmp, $fetchType, $tmpCount)
     {
         $out = array();
         $cont = 0;
@@ -164,9 +170,16 @@ class Pivot
                         foreach (array_keys($this->_splits[$split]) as $col) {
                             $colValues = $cols[$col];
                             foreach ($this->_columnValues as $_k) {
-                                $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                $value = ($_k instanceof Pivot_Callback) ? 
-                                    $_k->cbk($colValues) : $colValues[$k];
+                                $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                                
+                                if ($_k instanceof Pivot_Count) {
+                                    $value = $tmpCount[$p0][$split][$col][$k];
+                                } elseif ($_k instanceof Pivot_Callback) {
+                                    $value = $_k->cbk($colValues);
+                                } else {
+                                    $value = $colValues[$k];
+                                }
+                                
                                 $_out["{$split}_{$col}_{$k}"] = $value;
                                 if ($this->_lineTotal) {
                                     $_lineTotal[$k] += $value;
@@ -176,13 +189,13 @@ class Pivot
                                 }
                             }
                         }
-                        if ($this->_lineTotal) {
-                            foreach ($this->_columnValues as $_k) {
-                                $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                $value = ($_k instanceof Pivot_Callback) ? 
-                                    $_k->cbk($_lineTotal) : $_lineTotal[$k];
-                                $_out[self::TOTAL . "_{$k}"] = $value;
-                            }
+                    }
+                    if ($this->_lineTotal) {
+                        foreach ($this->_columnValues as $_k) {
+                            $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                            $value = ($_k instanceof Pivot_Callback) ? 
+                                $_k->cbk($_lineTotal) : $_lineTotal[$k];
+                            $_out[self::TOTAL . "_{$k}"] = $value;
                         }
                     }
                     $out[] = $_out;
@@ -206,9 +219,14 @@ class Pivot
                             foreach (array_keys($this->_splits[$split]) as $col) {
                                 $colValues = $cols[$col];
                                 foreach ($this->_columnValues as $_k) {
-                                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                    $value = ($_k instanceof Pivot_Callback) ? 
-                                        $_k->cbk($colValues) : $colValues[$k];
+                                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                                    if ($_k instanceof Pivot_Count) {
+                                        $value = $tmpCount[$p0][$p1][$split][$col][$k];
+                                    } elseif ($_k instanceof Pivot_Callback) {
+                                        $value = $_k->cbk($colValues);
+                                    } else {
+                                        $value = $colValues[$k];
+                                    }
                                     $_out["{$split}_{$col}_{$k}"] = $value;
                                     if ($this->_lineTotal) {
                                         $_lineTotal[$k] += $value;
@@ -221,13 +239,13 @@ class Pivot
                                     }
                                 }
                             }
-                            if ($this->_lineTotal) {
-                                foreach ($this->_columnValues as $_k) {
-                                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                    $value = ($_k instanceof Pivot_Callback) ? 
-                                        $_k->cbk($_lineTotal) : $_lineTotal[$k];
-                                    $_out[self::TOTAL . "_{$k}"] = $value;
-                                }
+                        }
+                        if ($this->_lineTotal) {
+                            foreach ($this->_columnValues as $_k) {
+                                $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                                $value = ($_k instanceof Pivot_Callback) ? 
+                                    $_k->cbk($_lineTotal) : $_lineTotal[$k];
+                                $_out[self::TOTAL . "_{$k}"] = $value;
                             }
                         }
                         $out[] = $_out;
@@ -250,7 +268,7 @@ class Pivot
                         foreach ($p0Total as $split => $values) {
                             foreach ($values as $col => $colValues) {
                                 foreach ($this->_columnValues as $_k) {
-                                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                     $value = ($_k instanceof Pivot_Callback) ? 
                                         $_k->cbk($p0Total[$split][$col]) : $p0Total[$split][$col][$k];
                                     $_out["{$split}_{$col}_{$k}"] = $value;
@@ -260,7 +278,7 @@ class Pivot
                         }
                         if ($this->_lineTotal) {
                             foreach ($this->_columnValues as $_k) {
-                                $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                 $value = ($_k instanceof Pivot_Callback) ? 
                                     $_k->cbk($_lineTotal) : $_lineTotal[$k];
                                 $_out[self::TOTAL . "_{$k}"] = $_lineTotal[$k];
@@ -291,9 +309,14 @@ class Pivot
                                 foreach (array_keys($this->_splits[$split]) as $col) {
                                     $colValues = $cols[$col];
                                     foreach ($this->_columnValues as $_k) {
-                                        $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                        $value = ($_k instanceof Pivot_Callback) ? 
-                                            $_k->cbk($colValues) : $colValues[$k];
+                                        $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                                        if ($_k instanceof Pivot_Count) {
+                                            $value = $tmpCount[$p0][$p1][$p2][$split][$col][$k];
+                                        } elseif ($_k instanceof Pivot_Callback) {
+                                            $value = $_k->cbk($colValues);
+                                        } else {
+                                            $value = $colValues[$k];
+                                        }
                                         $_out["{$split}_{$col}_{$k}"] = $value;
                                         if ($this->_lineTotal) {
                                             $_lineTotal[$k] += $value;
@@ -307,13 +330,13 @@ class Pivot
                                         }
                                     }
                                 }
-                                if ($this->_lineTotal) {
-                                    foreach ($this->_columnValues as $_k) {
-                                        $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
-                                        $value = ($_k instanceof Pivot_Callback) ? 
-                                            $_k->cbk($_lineTotal) : $_lineTotal[$k];
-                                        $_out[self::TOTAL . "_{$k}"] = $value;
-                                    }
+                            }
+                            if ($this->_lineTotal) {
+                                foreach ($this->_columnValues as $_k) {
+                                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
+                                    $value = ($_k instanceof Pivot_Callback) ? 
+                                        $_k->cbk($_lineTotal) : $_lineTotal[$k];
+                                    $_out[self::TOTAL . "_{$k}"] = $value;
                                 }
                             }
                             $out[] = $_out;
@@ -337,7 +360,7 @@ class Pivot
                         foreach ($p0Total as $split => $values) {
                             foreach ($values as $col => $colValues) {
                                 foreach ($this->_columnValues as $_k) {
-                                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                     $value = ($_k instanceof Pivot_Callback) ? 
                                         $_k->cbk($p0Total[$split][$col]) : $p0Total[$split][$col][$k];
                                     $_out["{$split}_{$col}_{$k}"] = $value;
@@ -347,7 +370,7 @@ class Pivot
                         }
                         if ($this->_lineTotal) {
                             foreach ($this->_columnValues as $_k) {
-                                $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                 $value = ($_k instanceof Pivot_Callback) ? 
                                     $_k->cbk($_lineTotal) : $_lineTotal[$k];
                                 $_out[self::TOTAL . "_{$k}"] = $value;
@@ -374,7 +397,7 @@ class Pivot
                         foreach ($p1Total as $split => $values) {
                             foreach ($values as $col => $colValues) {
                                 foreach ($this->_columnValues as $_k) {
-                                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                     $value = ($_k instanceof Pivot_Callback) ? 
                                         $_k->cbk($p1Total[$split][$col]) : $p1Total[$split][$col][$k];
                                     $_out["{$split}_{$col}_{$k}"] = $value;
@@ -384,7 +407,7 @@ class Pivot
                         }
                         if ($this->_lineTotal) {
                             foreach ($this->_columnValues as $_k) {
-                                $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                                $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                                 $value = ($_k instanceof Pivot_Callback) ? 
                                     $_k->cbk($_lineTotal) : $_lineTotal[$k];
                                 $_out[self::TOTAL . "_{$k}"] = $value;
@@ -413,7 +436,7 @@ class Pivot
             foreach ($fullTotal as $split => $values) {
                 foreach ($values as $col => $colValues) {
                     foreach ($this->_columnValues as $_k) {
-                        $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                        $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                         $value = ($_k instanceof Pivot_Callback) ? 
                             $_k->cbk($fullTotal[$split][$col]) : $fullTotal[$split][$col][$k];
                         $_out["{$split}_{$col}_{$k}"] = $value;
@@ -423,7 +446,7 @@ class Pivot
             }
             if ($this->_lineTotal) {
                 foreach ($this->_columnValues as $_k) {
-                    $k = ($_k instanceof Pivot_Callback) ? $_k->getKey() : $_k;
+                    $k = ($_k instanceof Pivot_Callback || $_k instanceof Pivot_Count) ? $_k->getKey() : $_k;
                     $value = ($_k instanceof Pivot_Callback) ? $_k->cbk($_lineTotal) : $_lineTotal[$k];
                     $_out[self::TOTAL . "_{$k}"] = $value;
                 }
@@ -458,6 +481,25 @@ class Pivot
     static function callback($key, $cbk)
     {
         return new Pivot_Callback($key, $cbk);
+    }
+    
+    static function count($key)
+    {
+        return new Pivot_Count($key);
+    }
+}
+
+class Pivot_Count
+{
+    private $_key = null;
+    function __construct($key)
+    {
+        $this->_key = $key;
+    }
+    
+    public function getKey()
+    {
+        return $this->_key;
     }
 }
 
